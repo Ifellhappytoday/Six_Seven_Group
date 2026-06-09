@@ -74,4 +74,61 @@ public class AuthController {
 
         return false;
     }
+
+    /**
+     * Registers a new staff member. Only callable by Admin.
+     * Returns "SUCCESS", "EMAIL_TAKEN", or "ERROR".
+     */
+    public String registerStaff(String fullName, String email, String password, String contactNumber, String jobRole) {
+        // Check email uniqueness across both tables
+        if (emailExists(email)) return "EMAIL_TAKEN";
+
+        String query = "INSERT INTO Staff (full_name, email, password, contact_number, job_role) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setString(1, fullName);
+            pstmt.setString(2, email);
+            pstmt.setString(3, password);
+            pstmt.setString(4, contactNumber.isEmpty() ? null : contactNumber);
+            pstmt.setString(5, jobRole);
+            return pstmt.executeUpdate() > 0 ? "SUCCESS" : "ERROR";
+        } catch (SQLException e) {
+            System.out.println("Register Staff Error: " + e.getMessage());
+            return "ERROR";
+        }
+    }
+
+    /**
+     * Returns all active staff members as a 2D array: {staff_id, full_name, email, contact_number, job_role}.
+     */
+    public java.util.List<String[]> getAllStaff() {
+        java.util.List<String[]> list = new java.util.ArrayList<>();
+        String query = "SELECT staff_id, full_name, email, contact_number, job_role FROM Staff WHERE is_deleted = FALSE ORDER BY staff_id";
+        try (Connection conn = getConnection(); java.sql.Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery(query)) {
+            while (rs.next()) {
+                list.add(new String[]{
+                    String.valueOf(rs.getInt("staff_id")),
+                    rs.getString("full_name"),
+                    rs.getString("email"),
+                    rs.getString("contact_number") == null ? "" : rs.getString("contact_number"),
+                    rs.getString("job_role")
+                });
+            }
+        } catch (SQLException e) { System.out.println("DB Error: " + e.getMessage()); }
+        return list;
+    }
+
+    /**
+     * Soft-deletes a staff member by staff_id.
+     */
+    public boolean deleteStaff(int staffId) {
+        String query = "UPDATE Staff SET is_deleted = TRUE WHERE staff_id = ?";
+        try (Connection conn = getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, staffId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.out.println("Delete Staff Error: " + e.getMessage());
+            return false;
+        }
+    }
 }

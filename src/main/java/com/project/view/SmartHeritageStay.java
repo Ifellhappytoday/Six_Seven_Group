@@ -93,30 +93,36 @@ class LoginFrame extends JFrame {
         setVisible(true);
     }
 
-    private void validateLogin() {
-        String email = emailField.getText();
-        String password = new String(passwordField.getPassword());
+    // ── Replace the validateLogin() method in LoginFrame with this version ──
+// This passes the email to both dashboards so the profile tab and per-guest
+// status logic work correctly.
 
-        if (email.isEmpty() || password.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Please fill all fields", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
+private void validateLogin() {
+    String email    = emailField.getText().trim();
+    String password = new String(passwordField.getPassword());
 
-        String role = authController.authenticateUser(email, password);
-        
-        if (role != null) {
-            JOptionPane.showMessageDialog(this, "Login successful! Role: " + role, "Success", JOptionPane.INFORMATION_MESSAGE);
-            dispose();
-            
-            if (role.equalsIgnoreCase("Guest")) {
-                new GuestDashboardGUI(email).setVisible(true);
-            } else {
-                new StaffDashboardGUI(role).setVisible(true);
-            }
-        } else {
-            JOptionPane.showMessageDialog(this, "Invalid email or password", "Login Failed", JOptionPane.ERROR_MESSAGE);
-        }
+    if (email.isEmpty() || password.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Please fill all fields", "Error", JOptionPane.ERROR_MESSAGE);
+        return;
     }
+
+    String role = authController.authenticateUser(email, password);
+
+    if (role != null) {
+        JOptionPane.showMessageDialog(this, "Login successful! Role: " + role, "Success", JOptionPane.INFORMATION_MESSAGE);
+        dispose();
+
+        if (role.equalsIgnoreCase("Guest")) {
+            // Pass email so GuestDashboardGUI can resolve guestId and load profile
+            new GuestDashboardGUI(email).setVisible(true);
+        } else {
+            // Pass role AND email so StaffDashboardGUI can load staff profile
+            new StaffDashboardGUI(role, email).setVisible(true);
+        }
+    } else {
+        JOptionPane.showMessageDialog(this, "Invalid email or password", "Login Failed", JOptionPane.ERROR_MESSAGE);
+    }
+}
 }
 
 // -------------------- REGISTER FRAME --------------------

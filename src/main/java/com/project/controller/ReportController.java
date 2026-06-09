@@ -76,35 +76,45 @@ public class ReportController {
             SELECT
                 hp.property_id,
                 hp.property_name,
-                COALESCE(SUM(
-                    GREATEST(0, EXTRACT(DAY FROM (
-                        LEAST(b.end_date, ?) - GREATEST(b.start_date, ?)
-                    ))::int)
-                ) FILTER (WHERE b.booking_id IS NOT NULL AND b.is_deleted = FALSE), 0) AS rental_days,
-                COALESCE(SUM(
-                    GREATEST(0, EXTRACT(DAY FROM (
-                        LEAST(m.end_date, ?) - GREATEST(m.start_date, ?)
-                    ))::int)
-                ) FILTER (WHERE m.maintenance_id IS NOT NULL AND m.is_deleted = FALSE AND m.status NOT IN ('Cancelled')), 0) AS maintenance_days,
-                COALESCE(SUM(b.total_price) FILTER (WHERE b.booking_id IS NOT NULL AND b.is_deleted = FALSE), 0) AS total_revenue,
-                COALESCE(SUM(m.estimated_cost) FILTER (WHERE m.maintenance_id IS NOT NULL AND m.is_deleted = FALSE AND m.status NOT IN ('Cancelled')), 0) AS total_maint_cost
+                COALESCE(b.rental_days, 0) AS rental_days,
+                COALESCE(m.maintenance_days, 0) AS maintenance_days,
+                COALESCE(b.total_revenue, 0) AS total_revenue,
+                COALESCE(m.total_maint_cost, 0) AS total_maint_cost
             FROM HeritageProperty hp
-            LEFT JOIN Booking b ON hp.property_id = b.property_id
-                AND b.start_date < ? AND b.end_date > ?
-            LEFT JOIN Maintenance m ON hp.property_id = m.property_id
-                AND m.start_date < ? AND m.end_date > ?
+            LEFT JOIN (
+                SELECT
+                    property_id,
+                    SUM(GREATEST(0, (LEAST(end_date, ?::date) - GREATEST(start_date, ?::date)))) AS rental_days,
+                    SUM(total_price) AS total_revenue
+                FROM Booking
+                WHERE is_deleted = FALSE AND start_date < ? AND end_date > ?
+                GROUP BY property_id
+            ) b ON hp.property_id = b.property_id
+            LEFT JOIN (
+                SELECT
+                    property_id,
+                    SUM(GREATEST(0, (LEAST(end_date, ?::date) - GREATEST(start_date, ?::date)))) AS maintenance_days,
+                    SUM(estimated_cost) AS total_maint_cost
+                FROM Maintenance
+                WHERE is_deleted = FALSE AND status NOT IN ('Cancelled') AND start_date < ? AND end_date > ?
+                GROUP BY property_id
+            ) m ON hp.property_id = m.property_id
             WHERE hp.is_deleted = FALSE
-            GROUP BY hp.property_id, hp.property_name
             ORDER BY hp.property_id
         """;
 
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(query)) {
-            // LEAST/GREATEST bounds
-            ps.setDate(1, toDate);   ps.setDate(2, fromDate); // rental days
-            ps.setDate(3, toDate);   ps.setDate(4, fromDate); // maint days
-            // JOIN conditions
-            ps.setDate(5, toDate);   ps.setDate(6, fromDate); // booking join
-            ps.setDate(7, toDate);   ps.setDate(8, fromDate); // maint join
+            // Booking Subquery parameters
+            ps.setDate(1, toDate);   // LEAST(end_date, ?)
+            ps.setDate(2, fromDate); // GREATEST(start_date, ?)
+            ps.setDate(3, toDate);   // start_date < ?
+            ps.setDate(4, fromDate); // end_date > ?
+            
+            // Maintenance Subquery parameters
+            ps.setDate(5, toDate);   // LEAST(end_date, ?)
+            ps.setDate(6, fromDate); // GREATEST(start_date, ?)
+            ps.setDate(7, toDate);   // start_date < ?
+            ps.setDate(8, fromDate); // end_date > ?
 
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
