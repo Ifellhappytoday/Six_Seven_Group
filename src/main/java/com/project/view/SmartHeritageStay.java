@@ -8,23 +8,25 @@ import java.util.regex.Pattern;
 
 public class SmartHeritageStay {
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new LoginFrame());
+        SwingUtilities.invokeLater(() -> new GuestDashboardGUI());
     }
 }
 
 // -------------------- LOGIN FRAME --------------------
-class LoginFrame extends JFrame {
+class LoginFrame extends JDialog {
     private JTextField emailField;
     private JPasswordField passwordField;
     private AuthController authController;
+    private JFrame parentFrame;
 
-    public LoginFrame() {
+    public LoginFrame(JFrame parent) {
+        super(parent, "Smart Heritage Stay - Login", true);
+        this.parentFrame = parent;
         authController = new AuthController();
         
-        setTitle("Smart Heritage Stay - Login");
         setSize(400, 350);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        setLocationRelativeTo(parent);
         setResizable(false);
         getContentPane().setBackground(new Color(245, 240, 230));
 
@@ -86,7 +88,7 @@ class LoginFrame extends JFrame {
             @Override
             public void mouseClicked(MouseEvent e) {
                 dispose();
-                new RegisterFrame();
+                new RegisterFrame(parentFrame);
             }
         });
 
@@ -111,6 +113,9 @@ private void validateLogin() {
     if (role != null) {
         JOptionPane.showMessageDialog(this, "Login successful! Role: " + role, "Success", JOptionPane.INFORMATION_MESSAGE);
         dispose();
+        if (parentFrame != null) {
+            parentFrame.dispose();
+        }
 
         if (role.equalsIgnoreCase("Guest")) {
             // Pass email so GuestDashboardGUI can resolve guestId and load profile
@@ -126,20 +131,22 @@ private void validateLogin() {
 }
 
 // -------------------- REGISTER FRAME --------------------
-class RegisterFrame extends JFrame {
+class RegisterFrame extends JDialog {
     private JTextField nameField;
     private JTextField emailField;
     private JPasswordField passwordField;
     private JPasswordField confirmPasswordField;
     private AuthController authController;
+    private JFrame parentFrame;
 
-    public RegisterFrame() {
+    public RegisterFrame(JFrame parent) {
+        super(parent, "Smart Heritage Stay - Register", true);
+        this.parentFrame = parent;
         authController = new AuthController();
         
-        setTitle("Smart Heritage Stay - Register");
         setSize(450, 450);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null);
+        setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        setLocationRelativeTo(parent);
         setResizable(false);
         getContentPane().setBackground(new Color(245, 240, 230));
 
@@ -224,7 +231,7 @@ class RegisterFrame extends JFrame {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 dispose();
-                new LoginFrame();
+                new LoginFrame(parentFrame);
             }
         });
 
@@ -257,19 +264,20 @@ class RegisterFrame extends JFrame {
             return;
         }
 
-        // Check if email already exists in Guest or Staff table
-        if (authController.emailExists(email)) {
-            JOptionPane.showMessageDialog(this, "Email already exists. Please use a different email.", "Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
         // Send to Database
-        if (authController.registerGuest(name, email, password)) {
-            JOptionPane.showMessageDialog(this, "Registration successful! You can now login.", "Success", JOptionPane.INFORMATION_MESSAGE);
-            dispose();
-            new LoginFrame();
-        } else {
-            JOptionPane.showMessageDialog(this, "Registration failed. Please try again.", "Error", JOptionPane.ERROR_MESSAGE);
+        String result = authController.registerGuest(name.trim(), email.trim(), password);
+        switch (result) {
+            case "SUCCESS" -> {
+                JOptionPane.showMessageDialog(this, "Registration successful! You can now login.", "Success", JOptionPane.INFORMATION_MESSAGE);
+                dispose();
+                new LoginFrame(parentFrame);
+            }
+            case "NAME_TAKEN"  -> JOptionPane.showMessageDialog(this,
+                "This name is already registered. Please use a different full name.", "Name Taken", JOptionPane.ERROR_MESSAGE);
+            case "EMAIL_TAKEN" -> JOptionPane.showMessageDialog(this,
+                "This email is already registered. Please use a different email.", "Email Taken", JOptionPane.ERROR_MESSAGE);
+            default            -> JOptionPane.showMessageDialog(this,
+                "Registration failed. Please try again.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 }

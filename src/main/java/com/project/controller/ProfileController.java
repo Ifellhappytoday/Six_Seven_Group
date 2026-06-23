@@ -32,8 +32,18 @@ public class ProfileController {
         return null;
     }
 
-    /** Updates guest name, email, and contact. Returns "SUCCESS", "EMAIL_TAKEN", or "ERROR" */
+    /** Updates guest name, email, and contact. Returns "SUCCESS", "NAME_TAKEN", "EMAIL_TAKEN", or "ERROR" */
     public String updateGuestProfile(int guestId, String fullName, String email, String contact) {
+        // Check if name is taken by another guest or staff (case-insensitive)
+        String checkName = "SELECT 1 FROM Guest WHERE LOWER(full_name) = LOWER(?) AND guest_id != ? AND is_deleted = FALSE"
+                         + " UNION SELECT 1 FROM Staff WHERE LOWER(full_name) = LOWER(?) AND is_deleted = FALSE";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(checkName)) {
+            ps.setString(1, fullName);
+            ps.setInt(2, guestId);
+            ps.setString(3, fullName);
+            if (ps.executeQuery().next()) return "NAME_TAKEN";
+        } catch (SQLException e) { e.printStackTrace(); return "ERROR"; }
+
         // Check if email is taken by another guest
         String checkEmail = "SELECT guest_id FROM Guest WHERE email = ? AND guest_id != ? AND is_deleted = FALSE";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(checkEmail)) {
@@ -92,8 +102,18 @@ public class ProfileController {
         return null;
     }
 
-    /** Updates staff name, email, and contact. Returns "SUCCESS", "EMAIL_TAKEN", or "ERROR" */
+    /** Updates staff name, email, and contact. Returns "SUCCESS", "NAME_TAKEN", "EMAIL_TAKEN", or "ERROR" */
     public String updateStaffProfile(int staffId, String fullName, String email, String contact) {
+        // Check if name is taken by another staff or guest (case-insensitive)
+        String checkName = "SELECT 1 FROM Staff WHERE LOWER(full_name) = LOWER(?) AND staff_id != ? AND is_deleted = FALSE"
+                         + " UNION SELECT 1 FROM Guest WHERE LOWER(full_name) = LOWER(?) AND is_deleted = FALSE";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(checkName)) {
+            ps.setString(1, fullName);
+            ps.setInt(2, staffId);
+            ps.setString(3, fullName);
+            if (ps.executeQuery().next()) return "NAME_TAKEN";
+        } catch (SQLException e) { e.printStackTrace(); return "ERROR"; }
+
         String checkEmail = "SELECT staff_id FROM Staff WHERE email = ? AND staff_id != ? AND is_deleted = FALSE";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(checkEmail)) {
             ps.setString(1, email);

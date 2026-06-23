@@ -136,6 +136,25 @@ public class MaintenanceController {
         } catch (SQLException e) { e.printStackTrace(); return false; }
     }
 
+    /**
+     * Returns true if the given staff name is assigned to any active
+     * (non-deleted, non-Completed, non-Cancelled) maintenance record.
+     * Used to prevent deleting a staff member who still has maintenance duties.
+     */
+    public boolean hasActiveMaintenance(String staffName) {
+        String query = "SELECT COUNT(*) FROM Maintenance " +
+                "WHERE assigned_to = ? AND is_deleted = FALSE " +
+                "AND status NOT IN ('Completed', 'Cancelled')";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, staffName);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() && rs.getInt(1) > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     private Maintenance mapRow(ResultSet rs) throws SQLException {
         return new Maintenance(
             rs.getInt("maintenance_id"),

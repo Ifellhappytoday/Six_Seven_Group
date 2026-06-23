@@ -38,17 +38,20 @@ public class AuthController {
         return null; // Login failed
     }
 
-    // Register Guest using EMAIL
-    public boolean registerGuest(String fullName, String email, String pass) {
+    // Register Guest using EMAIL — returns "SUCCESS", "EMAIL_TAKEN", "NAME_TAKEN", or "ERROR"
+    public String registerGuest(String fullName, String email, String pass) {
+        if (nameExists(fullName))  return "NAME_TAKEN";
+        if (emailExists(email))    return "EMAIL_TAKEN";
+
         String query = "INSERT INTO Guest (full_name, email, password) VALUES (?, ?, ?)";
         try (Connection conn = getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
             pstmt.setString(1, fullName);
             pstmt.setString(2, email);
             pstmt.setString(3, pass);
-            return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) { 
-            System.out.println("Register Error: " + e.getMessage()); 
-            return false; 
+            return pstmt.executeUpdate() > 0 ? "SUCCESS" : "ERROR";
+        } catch (SQLException e) {
+            System.out.println("Register Error: " + e.getMessage());
+            return "ERROR";
         }
     }
 
@@ -75,13 +78,31 @@ public class AuthController {
         return false;
     }
 
+    // Check if full_name already exists in Guest or Staff table
+    public boolean nameExists(String fullName) {
+        String guestQuery = "SELECT 1 FROM Guest WHERE LOWER(full_name) = LOWER(?) AND is_deleted = FALSE";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(guestQuery)) {
+            ps.setString(1, fullName);
+            if (ps.executeQuery().next()) return true;
+        } catch (SQLException e) { System.out.println("DB Error: " + e.getMessage()); }
+
+        String staffQuery = "SELECT 1 FROM Staff WHERE LOWER(full_name) = LOWER(?) AND is_deleted = FALSE";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(staffQuery)) {
+            ps.setString(1, fullName);
+            if (ps.executeQuery().next()) return true;
+        } catch (SQLException e) { System.out.println("DB Error: " + e.getMessage()); }
+
+        return false;
+    }
+
     /**
      * Registers a new staff member. Only callable by Admin.
      * Returns "SUCCESS", "EMAIL_TAKEN", or "ERROR".
      */
     public String registerStaff(String fullName, String email, String password, String contactNumber, String jobRole) {
-        // Check email uniqueness across both tables
-        if (emailExists(email)) return "EMAIL_TAKEN";
+        // Check name and email uniqueness across both tables
+        if (nameExists(fullName))  return "NAME_TAKEN";
+        if (emailExists(email))    return "EMAIL_TAKEN";
 
         String query = "INSERT INTO Staff (full_name, email, password, contact_number, job_role) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
@@ -128,6 +149,20 @@ public class AuthController {
             return pstmt.executeUpdate() > 0;
         } catch (SQLException e) {
             System.out.println("Delete Staff Error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Soft-deletes a guest account by guest_id.
+     */
+    public boolean deleteGuest(int guestId) {
+        String query = "UPDATE Guest SET is_deleted = TRUE WHERE guest_id = ?";
+        try (Connection conn = getConnection(); PreparedStatement pstmt = conn.prepareStatement(query)) {
+            pstmt.setInt(1, guestId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.out.println("Delete Guest Error: " + e.getMessage());
             return false;
         }
     }
